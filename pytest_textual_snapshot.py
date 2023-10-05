@@ -6,7 +6,7 @@ from datetime import datetime
 from operator import attrgetter
 from os import PathLike
 from pathlib import Path, PurePath
-from typing import Awaitable, Union, List, Optional, Callable, Iterable, TYPE_CHECKING
+from typing import Awaitable, Union, List, Optional, Callable, Iterable, TYPE_CHECKING, Dict, Tuple
 
 import pytest
 from _pytest.config import ExitCode
@@ -16,15 +16,17 @@ from _pytest.terminal import TerminalReporter
 from jinja2 import Template
 from rich.console import Console
 from syrupy import SnapshotAssertion
+from syrupy.extensions.image import SVGImageSnapshotExtension
 
+from textual.app import App
 if TYPE_CHECKING:
-    from textual.app import App
     from textual.pilot import Pilot
 
 TEXTUAL_SNAPSHOT_SVG_KEY = pytest.StashKey[str]()
 TEXTUAL_ACTUAL_SVG_KEY = pytest.StashKey[str]()
 TEXTUAL_SNAPSHOT_PASS = pytest.StashKey[bool]()
 
+SNAPSHOT_RESULTS = pytest.StashKey[Dict[str, Tuple[bool, App, str, str]]]()
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -109,6 +111,26 @@ def snap_compare(
 
     return compare
 
+@pytest.fixture
+def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callable[[App, Optional[str]], bool]:
+    snapshot.use_extension(SVGImageSnapshotExtension)
+    def compare(app: App, name: Optional[str]=None):
+        if name == "snapshot":
+            raise ValueError("cannot name a snapshot 'snapshot'!")
+        node = request.node
+        actual_screenshot = app.export_screenshot()
+        result = actual_screenshot == snapshot(name=name)
+
+        key = name if name is not None else 'snapshot'
+        results = node.stash.get(SNAPSHOT_RESULTS, {})
+        if result is False:
+            results.update({key: (False, app, actual_screenshot, snapshot(name=name))})
+        else:
+            results.update({key: (True, app, "", "")})
+        node.stash[SNAPSHOT_RESULTS] = results
+        return result
+        
+    return compare
 
 @dataclass
 class SvgSnapshotDiff:
@@ -136,25 +158,44 @@ def pytest_sessionfinish(
     num_snapshots_passing = 0
 
     for item in session.items:
+        path, line_index, name = item.reportinfo()
         # Grab the data our fixture attached to the pytest node
-        num_snapshots_passing += int(item.stash.get(TEXTUAL_SNAPSHOT_PASS, False))
-        snapshot_svg = item.stash.get(TEXTUAL_SNAPSHOT_SVG_KEY, None)
-        actual_svg = item.stash.get(TEXTUAL_ACTUAL_SVG_KEY, None)
-        app = item.stash.get(app_stash_key(), None)
+        if SNAPSHOT_RESULTS in item.stash:
+            for snap_name, result in item.stash[SNAPSHOT_RESULTS].items():
+                num_snapshots_passing += int(result[0])
+                app = result[1]
+                actual_svg = result[2]
+                snapshot_svg = result[3]
+                if not result[0]:
+                    diffs.append(
+                        SvgSnapshotDiff(
+                            snapshot=str(snapshot_svg),
+                            actual=str(actual_svg),
+                            test_name=name+f" : {snap_name}" if snap_name !="snapshot" else "",
+                            path=path,
+                            line_number=line_index + 1,
+                            app=app,
+                            environment=dict(os.environ),
+                        )
+                    )
+        else:
+            num_snapshots_passing += int(item.stash.get(TEXTUAL_SNAPSHOT_PASS, False))
+            snapshot_svg = item.stash.get(TEXTUAL_SNAPSHOT_SVG_KEY, None)
+            actual_svg = item.stash.get(TEXTUAL_ACTUAL_SVG_KEY, None)
+            app = item.stash.get(app_stash_key(), None)
 
-        if app:
-            path, line_index, name = item.reportinfo()
-            diffs.append(
-                SvgSnapshotDiff(
-                    snapshot=str(snapshot_svg),
-                    actual=str(actual_svg),
-                    test_name=name,
-                    path=path,
-                    line_number=line_index + 1,
-                    app=app,
-                    environment=dict(os.environ),
+            if app:
+                diffs.append(
+                    SvgSnapshotDiff(
+                        snapshot=str(snapshot_svg),
+                        actual=str(actual_svg),
+                        test_name=name,
+                        path=path,
+                        line_number=line_index + 1,
+                        app=app,
+                        environment=dict(os.environ),
+                    )
                 )
-            )
 
     if diffs:
         diff_sort_key = attrgetter("test_name")
