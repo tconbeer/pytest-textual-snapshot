@@ -125,7 +125,7 @@ def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callab
         results = node.stash.get(SNAPSHOT_RESULTS, {})
         if result is False:
             n = snapshot.num_executions
-            historical_screenshot = eval(snapshot.executions[n-1].recalled_data)
+            historical_screenshot = str(snapshot.executions[n-1].recalled_data)
             results.update({key: (False, app, actual_screenshot, historical_screenshot)})
         else:
             results.update({key: (True, app, "", "")})
