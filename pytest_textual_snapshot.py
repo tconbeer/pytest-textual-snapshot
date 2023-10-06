@@ -124,7 +124,9 @@ def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callab
         key = name if name is not None else 'snapshot'
         results = node.stash.get(SNAPSHOT_RESULTS, {})
         if result is False:
-            results.update({key: (False, app, actual_screenshot, snapshot(name=name))})
+            n = snapshot.num_executions
+            historical_screenshot = eval(snapshot.executions[n-1].recalled_data)
+            results.update({key: (False, app, actual_screenshot, historical_screenshot)})
         else:
             results.update({key: (True, app, "", "")})
         node.stash[SNAPSHOT_RESULTS] = results
@@ -169,8 +171,8 @@ def pytest_sessionfinish(
                 if not result[0]:
                     diffs.append(
                         SvgSnapshotDiff(
-                            snapshot=str(snapshot_svg),
-                            actual=str(actual_svg),
+                            snapshot=snapshot_svg,
+                            actual=actual_svg,
                             test_name=name+f" : {snap_name}" if snap_name !="snapshot" else "",
                             path=path,
                             line_number=line_index + 1,
