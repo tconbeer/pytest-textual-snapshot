@@ -112,9 +112,9 @@ def snap_compare(
     return compare
 
 @pytest.fixture
-def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callable[[App, Optional[str]], bool]:
+def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callable[[App, Optional[str]], Awaitable[bool]]:
     snapshot.use_extension(SVGImageSnapshotExtension)
-    async def compare(app: App, name: Optional[str]=None):
+    async def compare(app: App, name: Optional[str]=None) -> bool:
         if name == "snapshot":
             raise ValueError("cannot name a snapshot 'snapshot'!")
         node = request.node
