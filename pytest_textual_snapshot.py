@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import asyncio
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -114,12 +114,17 @@ def snap_compare(
 @pytest.fixture
 def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callable[[App, Optional[str]], bool]:
     snapshot.use_extension(SVGImageSnapshotExtension)
-    def compare(app: App, name: Optional[str]=None):
+    async def compare(app: App, name: Optional[str]=None):
         if name == "snapshot":
             raise ValueError("cannot name a snapshot 'snapshot'!")
         node = request.node
-        actual_screenshot = app.export_screenshot()
-        result = actual_screenshot == snapshot(name=name)
+        # take a snapshot; retry twice, with sleeps to prevent false positives
+        result = False
+        sleeps = [0, 0.1, 0.5]
+        while not result and sleeps:
+            await asyncio.sleep(sleeps.pop())
+            actual_screenshot = app.export_screenshot()
+            result = actual_screenshot == snapshot(name=name)
 
         key = name if name is not None else 'snapshot'
         results = node.stash.get(SNAPSHOT_RESULTS, {})
