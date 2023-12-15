@@ -120,7 +120,7 @@ def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callab
         node = request.node
         # take a snapshot; retry twice, with sleeps to prevent false positives
         result = False
-        sleeps = [0, 0.1, 0.5]
+        sleeps = [0.5, 0.1, 0]
         while not result and sleeps:
             await asyncio.sleep(sleeps.pop())
             actual_screenshot = app.export_screenshot()
