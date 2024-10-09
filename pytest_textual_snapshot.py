@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 import asyncio
 import os
 from dataclasses import dataclass
@@ -124,7 +125,10 @@ def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callab
         while not result and sleeps:
             await asyncio.sleep(sleeps.pop())
             actual_screenshot = app.export_screenshot()
-            result = actual_screenshot == snapshot(name=name)
+            classname_pattern = "terminal-\d+"
+            classname_placeholder = "terminal-9999999"
+            normalized_screenshot = re.subn(classname_pattern, classname_placeholder, actual_screenshot)
+            result = normalized_screenshot == snapshot(name=name)
 
         key = name if name is not None else 'snapshot'
         results = node.stash.get(SNAPSHOT_RESULTS, {})
