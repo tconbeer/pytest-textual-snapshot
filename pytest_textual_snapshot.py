@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 import asyncio
 import os
 from dataclasses import dataclass
@@ -6,7 +7,17 @@ from datetime import datetime
 from operator import attrgetter
 from os import PathLike
 from pathlib import Path, PurePath
-from typing import Awaitable, Union, List, Optional, Callable, Iterable, TYPE_CHECKING, Dict, Tuple
+from typing import (
+    Awaitable,
+    Union,
+    List,
+    Optional,
+    Callable,
+    Iterable,
+    TYPE_CHECKING,
+    Dict,
+    Tuple,
+)
 
 import pytest
 from _pytest.config import ExitCode
@@ -19,6 +30,7 @@ from syrupy import SnapshotAssertion
 from syrupy.extensions.image import SVGImageSnapshotExtension
 
 from textual.app import App
+
 if TYPE_CHECKING:
     from textual.pilot import Pilot
 
@@ -28,18 +40,25 @@ TEXTUAL_SNAPSHOT_PASS = pytest.StashKey[bool]()
 
 SNAPSHOT_RESULTS = pytest.StashKey[Dict[str, Tuple[bool, App, str, str]]]()
 
+
 def pytest_addoption(parser):
     parser.addoption(
-        '--snapshot-report', action='store', default="snapshot_report.html", help='Snapshot test output HTML path.'
+        "--snapshot-report",
+        action="store",
+        default="snapshot_report.html",
+        help="Snapshot test output HTML path.",
     )
+
 
 def app_stash_key() -> pytest.StashKey:
     try:
         return app_stash_key._key
     except AttributeError:
         from textual.app import App
+
         app_stash_key._key = pytest.StashKey[App]()
     return app_stash_key()
+
 
 @pytest.fixture
 def snap_compare(
@@ -76,6 +95,7 @@ def snap_compare(
             Whether the screenshot matches the snapshot.
         """
         from textual._import_app import import_app
+
         node = request.node
         path = Path(app_path)
         if path.is_absolute():
@@ -89,6 +109,7 @@ def snap_compare(
             app = import_app(str(resolved))
 
         from textual._doc import take_svg_screenshot
+
         actual_screenshot = take_svg_screenshot(
             app=app,
             press=press,
@@ -111,10 +132,14 @@ def snap_compare(
 
     return compare
 
+
 @pytest.fixture
-def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callable[[App, Optional[str]], Awaitable[bool]]:
+def app_snapshot(
+    snapshot: SnapshotAssertion, request: FixtureRequest
+) -> Callable[[App, Optional[str]], Awaitable[bool]]:
     snapshot.use_extension(SVGImageSnapshotExtension)
-    async def compare(app: App, name: Optional[str]=None) -> bool:
+
+    async def compare(app: App, name: Optional[str] = None) -> bool:
         if name == "snapshot":
             raise ValueError("cannot name a snapshot 'snapshot'!")
         node = request.node
@@ -124,20 +149,28 @@ def app_snapshot(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callab
         while not result and sleeps:
             await asyncio.sleep(sleeps.pop())
             actual_screenshot = app.export_screenshot()
-            result = actual_screenshot == snapshot(name=name)
+            classname_pattern = "terminal-\d+"
+            classname_placeholder = "terminal-9999999"
+            normalized_screenshot = re.sub(
+                classname_pattern, classname_placeholder, actual_screenshot
+            )
+            result = normalized_screenshot == snapshot(name=name)
 
-        key = name if name is not None else 'snapshot'
+        key = name if name is not None else "snapshot"
         results = node.stash.get(SNAPSHOT_RESULTS, {})
         if result is False:
             n = snapshot.num_executions
-            historical_screenshot = str(snapshot.executions[n-1].recalled_data)
-            results.update({key: (False, app, actual_screenshot, historical_screenshot)})
+            historical_screenshot = str(snapshot.executions[n - 1].recalled_data)
+            results.update(
+                {key: (False, app, normalized_screenshot, historical_screenshot)}
+            )
         else:
             results.update({key: (True, app, "", "")})
         node.stash[SNAPSHOT_RESULTS] = results
         return result
-        
+
     return compare
+
 
 @dataclass
 class SvgSnapshotDiff:
@@ -178,7 +211,9 @@ def pytest_sessionfinish(
                         SvgSnapshotDiff(
                             snapshot=snapshot_svg,
                             actual=actual_svg,
-                            test_name=name+f" : {snap_name}" if snap_name !="snapshot" else "",
+                            test_name=name + f" : {snap_name}"
+                            if snap_name != "snapshot"
+                            else "",
                             path=path,
                             line_number=line_index + 1,
                             app=app,
