@@ -142,6 +142,7 @@ def app_snapshot(
     async def compare(app: App, name: Optional[str] = None) -> bool:
         if name == "snapshot":
             raise ValueError("cannot name a snapshot 'snapshot'!")
+        key = name if name is not None else "snapshot"
         node = request.node
         # take a snapshot; retry twice, with sleeps to prevent false positives
         result = False
@@ -150,13 +151,12 @@ def app_snapshot(
             await asyncio.sleep(sleeps.pop())
             actual_screenshot = app.export_screenshot()
             classname_pattern = "terminal-\d+"
-            classname_placeholder = "terminal-9999999"
+            classname_placeholder = f"terminal-{hash(node.nodeid)}-{hash(key)}"
             normalized_screenshot = re.sub(
                 classname_pattern, classname_placeholder, actual_screenshot
             )
             result = normalized_screenshot == snapshot(name=name)
 
-        key = name if name is not None else "snapshot"
         results = node.stash.get(SNAPSHOT_RESULTS, {})
         if result is False:
             n = snapshot.num_executions
