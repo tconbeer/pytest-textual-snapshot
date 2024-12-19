@@ -28,6 +28,7 @@ from jinja2 import Template
 from rich.console import Console
 from syrupy import SnapshotAssertion
 from syrupy.extensions.image import SVGImageSnapshotExtension
+import hashlib
 
 from textual.app import App
 
@@ -58,6 +59,9 @@ def app_stash_key() -> pytest.StashKey:
 
         app_stash_key._key = pytest.StashKey[App]()
     return app_stash_key()
+
+def _hash(s: str) -> str:
+    return hashlib.md5(s.encode('utf-8')).hexdigest()
 
 
 @pytest.fixture
@@ -150,8 +154,8 @@ def app_snapshot(
         while not result and sleeps:
             await asyncio.sleep(sleeps.pop())
             actual_screenshot = app.export_screenshot()
-            classname_pattern = "terminal-\d+"
-            classname_placeholder = f"terminal-{hash(node.nodeid)}-{hash(key)}"
+            classname_pattern = r"terminal-\d+"
+            classname_placeholder = f"terminal-{_hash(node.nodeid)}-{_hash(key)}"
             normalized_screenshot = re.sub(
                 classname_pattern, classname_placeholder, actual_screenshot
             )
