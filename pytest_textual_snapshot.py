@@ -209,13 +209,17 @@ def pytest_sessionfinish(
                 num_snapshots_passing += int(result[0])
                 app = result[1]
                 actual_svg = result[2]
+                classname_pattern = r"terminal-[0-9a-f]+-[0-9a-f]+"
+                adjusted_actual_svg = re.sub(
+                    classname_pattern, lambda m: f"{m.group()}-new", actual_svg
+                )
                 snapshot_svg = result[3]
                 if not result[0]:
                     diffs.append(
                         SvgSnapshotDiff(
                             snapshot=snapshot_svg,
-                            actual=actual_svg,
-                            test_name=name + f" : {snap_name}"
+                            actual=adjusted_actual_svg,
+                            test_name=f"{name} : {snap_name}"
                             if snap_name != "snapshot"
                             else "",
                             path=path,
