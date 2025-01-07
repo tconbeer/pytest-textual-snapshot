@@ -3,7 +3,7 @@ import re
 import asyncio
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from operator import attrgetter
 from os import PathLike
 from pathlib import Path, PurePath
@@ -253,7 +253,7 @@ def pytest_sessionfinish(
 
         this_file_path = Path(__file__)
         snapshot_template_path = (
-            this_file_path.parent / "resources" / "snapshot_report_template.jinja2"
+            this_file_path.parent / "snapshot_report_template.jinja2"
         )
 
         snapshot_report_path = session.config.getoption("--snapshot-report")
@@ -272,7 +272,7 @@ def pytest_sessionfinish(
             pass_percentage=100 * (num_snapshots_passing / max(num_snapshot_tests, 1)),
             fail_percentage=100 * (num_fails / max(num_snapshot_tests, 1)),
             num_snapshot_tests=num_snapshot_tests,
-            now=datetime.utcnow(),
+            now=datetime.now(timezone.utc),
         )
         with open(snapshot_report_path, "w+", encoding="utf-8") as snapshot_file:
             snapshot_file.write(rendered_report)
